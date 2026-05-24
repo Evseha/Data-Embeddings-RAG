@@ -180,7 +180,12 @@ router.post("/rag/chat", async (req, res): Promise<void> => {
         "X-Title": "RAG Chat",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.1-8b-instruct:free",
+        models: [
+          "nvidia/nemotron-nano-9b-v2:free",
+          "liquid/lfm-2.5-1.2b-instruct:free",
+          "meta-llama/llama-3.2-3b-instruct:free",
+        ],
+        route: "fallback",
         temperature: 0.2,
         max_tokens: 700,
         messages: [{ role: "user", content: prompt }],

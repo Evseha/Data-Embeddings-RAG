@@ -88,9 +88,11 @@ export default function Home() {
                     updated[updated.length - 1].content = streamedContent;
                     return updated;
                   });
+                } else if (data.error) {
+                  throw new Error(`AI error: ${data.error}`);
                 }
-              } catch (e) {
-                // Ignore parse errors on partial chunks
+              } catch (e: any) {
+                if (e.message?.startsWith("AI error:")) throw e;
               }
             }
           }
