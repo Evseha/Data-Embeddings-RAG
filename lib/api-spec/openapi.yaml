@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: rag
+    description: RAG document operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,123 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /rag/documents:
+    get:
+      operationId: listDocuments
+      tags: [rag]
+      summary: List uploaded documents
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RagDocument"
+
+  /rag/upload:
+    post:
+      operationId: uploadDocument
+      tags: [rag]
+      summary: Upload a TXT document and index it
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/DocumentUploadForm"
+      responses:
+        "201":
+          description: Document uploaded and indexed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagDocument"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagError"
+
+  /rag/documents/{id}:
+    delete:
+      operationId: deleteDocument
+      tags: [rag]
+      summary: Delete a document and its chunks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagError"
+
+  /rag/retrieve:
+    post:
+      operationId: retrieveChunks
+      tags: [rag]
+      summary: Embed query and retrieve TOP-5 relevant chunks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RagQueryInput"
+      responses:
+        "200":
+          description: Retrieved chunks with similarity scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagRetrieveResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagError"
+
+  /rag/chat:
+    post:
+      operationId: streamChat
+      tags: [rag]
+      summary: Stream AI answer using retrieved context (SSE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RagChatInput"
+      responses:
+        "200":
+          description: SSE stream of AI response tokens
+          content:
+            text/event-stream: {}
+
+  /rag/stats:
+    get:
+      operationId: getRagStats
+      tags: [rag]
+      summary: Get RAG system stats
+      responses:
+        "200":
+          description: System stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +153,110 @@ components:
       required:
         - status
 
+    RagDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        filename:
+          type: string
+        chunkCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - filename
+        - chunkCount
+        - createdAt
+
+    RagChunk:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        similarity:
+          type: number
+        chunkIndex:
+          type: integer
+        documentId:
+          type: integer
+        documentName:
+          type: string
+      required:
+        - id
+        - text
+        - similarity
+        - chunkIndex
+        - documentId
+        - documentName
+
+    RagQueryInput:
+      type: object
+      properties:
+        question:
+          type: string
+          minLength: 1
+      required:
+        - question
+
+    RagChatInput:
+      type: object
+      properties:
+        question:
+          type: string
+          minLength: 1
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/RagChunk"
+      required:
+        - question
+        - chunks
+
+    RagRetrieveResult:
+      type: object
+      properties:
+        question:
+          type: string
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/RagChunk"
+      required:
+        - question
+        - chunks
+
+    RagStats:
+      type: object
+      properties:
+        documentCount:
+          type: integer
+        chunkCount:
+          type: integer
+        isModelReady:
+          type: boolean
+      required:
+        - documentCount
+        - chunkCount
+        - isModelReady
+
+    DocumentUploadForm:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required:
+        - file
+
+    RagError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

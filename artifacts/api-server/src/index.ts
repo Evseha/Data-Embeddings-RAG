@@ -1,5 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { initEmbedModel } from "./lib/embed.js";
+import { loadVectorStore } from "./lib/vectorStore.js";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +24,7 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  loadVectorStore().catch((err) => logger.error({ err }, "Vector store load failed"));
+  initEmbedModel().catch((err) => logger.error({ err }, "Embed model init failed"));
 });

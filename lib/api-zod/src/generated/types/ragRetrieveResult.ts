@@ -5,7 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { RagChunk } from './ragChunk';
 
-export interface HealthStatus {
-  status: string;
+export interface RagRetrieveResult {
+  question: string;
+  chunks: RagChunk[];
 }
