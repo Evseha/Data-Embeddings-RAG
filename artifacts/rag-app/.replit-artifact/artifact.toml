@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "RAG Chat"
+version = "1.0.0"
+id = "artifacts/rag-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24021
+
+[services.development]
+run = "pnpm --filter @workspace/rag-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rag-app", "run", "build" ]
+publicDir = "artifacts/rag-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24021"
+BASE_PATH = "/"

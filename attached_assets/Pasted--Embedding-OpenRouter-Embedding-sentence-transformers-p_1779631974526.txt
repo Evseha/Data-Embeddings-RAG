@@ -1,0 +1,166 @@
+ТЗ — Embedding и OpenRouter
+Embedding модель (обязательная)
+
+Использовать:
+
+sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+Источник:
+
+HuggingFace
+локальный inference
+без API
+без токенов
+бесплатно
+
+Поддержка:
+
+русский язык;
+английский;
+multilingual semantic search.
+Техническая реализация embeddings
+Библиотека
+npm install @xenova/transformers
+Пример реализации
+import { pipeline } from "@xenova/transformers";
+
+const extractor = await pipeline(
+  "feature-extraction",
+  "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+);
+
+export async function embed(text: string) {
+  const output = await extractor(text, {
+    pooling: "mean",
+    normalize: true,
+  });
+
+  return Array.from(output.data);
+}
+Требования к embedding системе
+Обязательно
+локальная генерация embeddings;
+никакого OpenAI;
+никакого API key;
+никакого HuggingFace inference API;
+inference только внутри приложения.
+Chunk Retrieval
+Алгоритм
+
+Использовать:
+
+cosine similarity;
+TOP-K retrieval.
+Количество:
+TOP 5 chunks
+OpenRouter
+Требование
+
+Использовать:
+
+только бесплатные OpenRouter модели;
+только через встроенный Replit connector.
+Подходящие free модели OpenRouter
+
+Примеры:
+
+meta-llama/llama-3.1-8b-instruct:free
+mistralai/mistral-7b-instruct:free
+google/gemma-2-9b-it:free
+deepseek/deepseek-r1-distill-llama-70b:free
+Конфигурация LLM
+Значения по умолчанию
+model = "meta-llama/llama-3.1-8b-instruct:free"
+temperature = 0.2
+max_tokens = 700
+Архитектура ответа
+После запроса пользователя:
+Generate query embedding
+Retrieve TOP-5 chunks
+Show retrieved chunks in UI
+Build prompt
+Send to OpenRouter
+Return final AI answer
+Prompt Template
+Ты AI-помощник для работы с документацией.
+
+Отвечай ТОЛЬКО на основе контекста.
+
+Если информации недостаточно —
+так и скажи.
+
+КОНТЕКСТ:
+{TOP_5_CHUNKS}
+
+ВОПРОС:
+{USER_QUESTION}
+
+ОТВЕТ:
+UI требования
+Цветовая схема
+Background
+#2b2b2b
+Panels
+#3a3a3a
+Borders
+#555555
+Text
+#e5e5e5
+Основные UI блоки
+Слева
+Chat Panel
+история сообщений;
+поле ввода;
+кнопка отправки.
+Справа
+Retrieved Chunks Panel
+
+Каждый chunk-card показывает:
+
+chunk text;
+similarity score;
+chunk index.
+Структура проекта
+/client
+  Chat.tsx
+  ChunkPanel.tsx
+  UploadPanel.tsx
+
+/server
+  rag.ts
+  embed.ts
+  vectorStore.ts
+  chunker.ts
+  openrouter.ts
+MVP критерии готовности
+
+Приложение считается готовым если:
+
+можно загрузить TXT;
+embeddings считаются локально;
+retrieval работает;
+выводятся TOP-5 chunks;
+OpenRouter отвечает;
+интерфейс серый и минималистичный;
+всё запускается через:
+npm install
+npm run dev
+Дополнительно
+Желательно
+
+Добавить:
+
+streaming AI response;
+markdown rendering;
+copy chunk button;
+loading states;
+indexing progress bar.
+Важно
+
+Embedding модель:
+
+multilingual;
+бесплатная;
+локальная;
+без токенов;
+без API.
