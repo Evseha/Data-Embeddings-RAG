@@ -8,7 +8,9 @@ import {
   addChunkVector,
   removeChunksByDocumentId,
   retrieveTopK,
+  getStore,
 } from "../../lib/vectorStore.js";
+import { extractKeywords, bm25Search } from "../../lib/bm25.js";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -109,6 +111,8 @@ router.delete("/rag/documents/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+const SIMILARITY_THRESHOLD = 0.40;
+
 router.post("/rag/retrieve", async (req, res): Promise<void> => {
   const { question } = req.body as { question?: string };
   if (!question || typeof question !== "string") {
@@ -121,19 +125,50 @@ router.post("/rag/retrieve", async (req, res): Promise<void> => {
     return;
   }
 
+  const keywords = extractKeywords(question);
+
   const queryVector = await embed(question);
-  const results = retrieveTopK(queryVector, 5);
+  const embeddingChunks = retrieveTopK(queryVector, 5);
+
+  const store = getStore();
+  const keywordChunks = bm25Search(
+    store.map((c) => ({ id: c.id, documentId: c.documentId, documentName: c.documentName, chunkIndex: c.chunkIndex, text: c.text })),
+    keywords,
+    5
+  );
+
+  // Merge: embedding results get weight 0.7, BM25 normalised weight 0.3
+  const maxBm25 = keywordChunks[0]?.bm25Score ?? 1;
+  const seen = new Map<number, { id: number; text: string; similarity: number; bm25Score: number; chunkIndex: number; documentId: number; documentName: string; combinedScore: number }>();
+
+  for (const c of embeddingChunks) {
+    seen.set(c.id, { ...c, bm25Score: 0, combinedScore: c.similarity * 0.7 });
+  }
+  for (const c of keywordChunks) {
+    const normalised = maxBm25 > 0 ? c.bm25Score / maxBm25 : 0;
+    if (seen.has(c.id)) {
+      const existing = seen.get(c.id)!;
+      existing.bm25Score = c.bm25Score;
+      existing.combinedScore += normalised * 0.3;
+    } else {
+      seen.set(c.id, { id: c.id, text: c.text, similarity: 0, bm25Score: c.bm25Score, chunkIndex: c.chunkIndex, documentId: c.documentId, documentName: c.documentName, combinedScore: normalised * 0.3 });
+    }
+  }
+
+  const mergedChunks = [...seen.values()]
+    .sort((a, b) => b.combinedScore - a.combinedScore)
+    .slice(0, 5);
+
+  const maxSimilarity = embeddingChunks[0]?.similarity ?? 0;
+  const belowThreshold = maxSimilarity < SIMILARITY_THRESHOLD;
 
   res.json({
     question,
-    chunks: results.map((r) => ({
-      id: r.id,
-      text: r.text,
-      similarity: r.similarity,
-      chunkIndex: r.chunkIndex,
-      documentId: r.documentId,
-      documentName: r.documentName,
-    })),
+    keywords,
+    embeddingChunks: embeddingChunks.map((r) => ({ id: r.id, text: r.text, similarity: r.similarity, chunkIndex: r.chunkIndex, documentId: r.documentId, documentName: r.documentName })),
+    keywordChunks: keywordChunks.map((r) => ({ id: r.id, text: r.text, bm25Score: r.bm25Score, chunkIndex: r.chunkIndex, documentId: r.documentId, documentName: r.documentName })),
+    mergedChunks: mergedChunks.map((r) => ({ id: r.id, text: r.text, similarity: r.similarity, bm25Score: r.bm25Score, chunkIndex: r.chunkIndex, documentId: r.documentId, documentName: r.documentName })),
+    belowThreshold,
   });
 });
 
@@ -163,7 +198,21 @@ router.post("/rag/chat", async (req, res): Promise<void> => {
     .map((c, i) => `[Chunk ${i + 1} from "${c.documentName}" | similarity: ${c.similarity.toFixed(3)}]\n${c.text}`)
     .join("\n\n---\n\n");
 
-  const prompt = `Ты AI-помощник для работы с документацией.\n\nОтвечай ТОЛЬКО на основе контекста.\n\nЕсли информации недостаточно — так и скажи.\n\nКОНТЕКСТ:\n${context}\n\nВОПРОС:\n${question}\n\nОТВЕТ:`;
+  const prompt = `Ты AI-консультант по документации. Отвечай СТРОГО на основе предоставленного контекста.
+
+ПРАВИЛА:
+1. Используй ТОЛЬКО информацию из контекста ниже.
+2. Если в контексте нет ответа на вопрос — ответь ТОЛЬКО этой фразой: "К сожалению, я не нашёл информацию по этому вопросу в базе знаний."
+3. Не придумывай факты, не используй общие знания.
+4. Отвечай на языке вопроса.
+
+КОНТЕКСТ:
+${context}
+
+ВОПРОС:
+${question}
+
+ОТВЕТ:`;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");

@@ -1,5 +1,4 @@
 import { db, ragChunksTable, ragDocumentsTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
 import { logger } from "./logger.js";
 
 export interface ChunkVector {
@@ -12,6 +11,10 @@ export interface ChunkVector {
 }
 
 let store: ChunkVector[] = [];
+
+export function getStore(): ChunkVector[] {
+  return store;
+}
 
 export async function loadVectorStore(): Promise<void> {
   try {
@@ -43,9 +46,7 @@ export function removeChunksByDocumentId(documentId: number): void {
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
+  let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     normA += a[i] * a[i];
