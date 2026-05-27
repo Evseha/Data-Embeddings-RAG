@@ -1,6 +1,6 @@
 import { logger } from "./logger.js";
 
-const MODEL_NAME = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
+const MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
 
 type Extractor = (text: string, opts: object) => Promise<{ data: Float32Array }>;
 
